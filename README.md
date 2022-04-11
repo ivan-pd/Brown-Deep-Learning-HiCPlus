@@ -1,5 +1,5 @@
 # HiCPlus 
-Ijeoma Meremiku (imeremik)
+Ijeoma Meremikwu (imeremik)
 Hannah Julius (hjulius)
 Elizabeth Wu (ewu32)
 Ivan Pineda-Dominguez (ipinedad)
