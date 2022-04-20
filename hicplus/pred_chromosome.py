@@ -64,7 +64,9 @@ def predict(M,N,inmodel):
         m = model.Net(40, 28)
         # m.load_state_dict(torch.load(inmodel, map_location=torch.device('cpu')))
         with tf.device('/cpu:0'):
-            model = tf.keras.models.load_model(inmodel)
+            # model = tf.keras.models.load_model(inmodel)
+            m.load_weights(inmodel)
+
 
 
         # if torch.cuda.is_available():
@@ -73,7 +75,7 @@ def predict(M,N,inmodel):
         # # IPD: Will have to ask about how to run a keras model on a gpu. However,
         # # I think we might not need to have this step if we have a gpu avalible
         # # since there is a setup to run the model on gpu...I think...
-        # # is_cuda_gpu_available = tf.test.is_gpu_available(cuda_only=True)
+        # is_cuda_gpu_available = tf.test.is_gpu_available(cuda_only=True)
         # if is_cuda_gpu_available:
         #     m = m.cuda()
 
