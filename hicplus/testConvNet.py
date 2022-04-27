@@ -16,6 +16,10 @@ from time import gmtime, strftime
 import sys
 import torch.nn as nn
 
+
+import tensorflow as tf
+
+
 use_gpu = 1
 
 conv2d1_filters_numbers = 8
@@ -59,8 +63,14 @@ output_length = sample_size - padding
 
 print(low_resolution_samples.shape)
 
-lowres_set = data.TensorDataset(torch.from_numpy(low_resolution_samples), torch.from_numpy(np.zeros(low_resolution_samples.shape[0])))
-lowres_loader = torch.utils.data.DataLoader(lowres_set, batch_size=batch_size, shuffle=False)
+# lowres_set = data.TensorDataset(torch.from_numpy(low_resolution_samples), torch.from_numpy(np.zeros(low_resolution_samples.shape[0])))
+# lowres_loader = torch.utils.data.DataLoader(lowres_set, batch_size=batch_size, shuffle=False)
+inputs = tf.convert_to_tensor(low_resolution_samples)
+targets = tf.convert_to_tensor(np.zeros(low_resolution_samples.shape[0]))
+lowres_set = tf.data.DataSet.from_tensor_slices((inputs, targets))
+lowres_loader = lowres_set.batch(batch_size)
+lowres_loader = lowres_loader.make_one_shot_iterator()
+
 
 production = False
 try:
@@ -71,19 +81,33 @@ try:
         no_padding_sample = high_resolution_samples[i][0][half_padding:(sample_size-half_padding) , half_padding:(sample_size - half_padding)]
         Y.append(no_padding_sample)
     Y = np.array(Y).astype(np.float32)
-    hires_set = data.TensorDataset(torch.from_numpy(Y), torch.from_numpy(np.zeros(Y.shape[0])))
-    hires_loader = torch.utils.data.DataLoader(hires_set, batch_size=batch_size, shuffle=False)
+
+    # hires_set = data.TensorDataset(torch.from_numpy(Y), torch.from_numpy(np.zeros(Y.shape[0])))
+    # hires_loader = torch.utils.data.DataLoader(hires_set, batch_size=batch_size, shuffle=False)
+
+    hires_inputs = tf.convert_to_tensor(Y)
+    hires_targets = tf.convert_to_tensor(np.zeros(Y.shape[0]))
+    hires_set = tf.data.DataSet.from_tensor_slices((hires_inputs, hires_targets))
+    hires_loader = hires_set.batch(batch_size)
+    hires_loader = hires_loader.make_one_shot_iterator()
+
 except:
     production = True
     hires_loader = lowres_loader
 
 Net = model.Net(40, 28)
-Net.load_state_dict(torch.load('../model/pytorch_model_12000'))
+# Net.load_state_dict(torch.load('../model/pytorch_model_12000'))
+
+# Have to instantiate model
+# Net = model.Net()
+# tf.keras.models.load_model('../model/pytorch_model_12000')
+Net.load_weights('../model/pytorch_model_12000')
+
 if use_gpu:
-    Net = Net.cuda()
+    Net = Net.cuda() #IPD: Not sure about the GPU stuff again
 
-_loss = nn.MSELoss()
-
+# _loss = nn.MSELoss()
+_loss = tf.keras.losses.MeanSquaredError()
 
 running_loss = 0.0
 running_loss_validate = 0.0
@@ -95,22 +119,45 @@ for i, (v1, v2) in enumerate(zip(lowres_loader, hires_loader)):
     _highRes, _ = v2
 
 
-    _lowRes = Variable(_lowRes)
-    _highRes = Variable(_highRes)
+    _lowRes = tf.Variable(_lowRes)
+    _highRes = tf.Variable(_highRes)
 
 
     if use_gpu:
         _lowRes = _lowRes.cuda()
         _highRes = _highRes.cuda()
-    y_prediction = Net(_lowRes)
+
+    ## I think this might be the gpu equivalent:
+    # is_cuda_gpu_available = tf.test.is_gpu_available(cuda_only=True)
+    # if is_cuda_gpu_available and use_gpu:
+    #    _lowRes = _lowRes.cuda()
+    #    _highRes = _highRes.cuda()
+
+
+    # y_prediction = Net(_lowRes)
+    # if (not production):
+    #     loss = _loss(_highRes, y_prediction)
+    y_prediction = model.call(_lowRes)
     if (not production):
         loss = _loss(y_prediction, _highRes)
 
 
-    running_loss += loss.data[0]
+    # running_loss += loss.data[0]
+    running_loss += loss
 
 print('-------', i, running_loss, strftime("%Y-%m-%d %H:%M:%S", gmtime()))
 
-y_prediction = y_prediction.data.cpu().numpy()
+# y_prediction = y_prediction.data.cpu().numpy()
+
+print("Is there a GPU available: "),
+print(tf.config.list_physical_devices("GPU"))
+
+print("Is the Tensor on GPU #0:  "),
+print(y_prediction.device.endswith('GPU:0'))
+
+with tf.device("CPU:0"):
+  assert y_prediction.device.endswith("CPU:0")
+  y_prediction.numpy()
+
 
 print(y_prediction.shape)
