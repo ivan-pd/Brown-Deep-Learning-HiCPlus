@@ -1,8 +1,8 @@
 # HiCPlus 
+Ivan Pineda-Dominguez (ipinedad)
 Ijeoma Meremikwu (imeremik)
 Hannah Julius (hjulius)
 Elizabeth Wu (ewu32)
-Ivan Pineda-Dominguez (ipinedad)
 
 ## Introduction: 	
 Hi-C Maps are among one of the most popular methods for studying the 3D organization of the genome. Unfortunately, this technology is plagued by high sequencing costs forcing researchers to use low sampled sequencing ultimately resulting in low-resolution data. To solve this problem, Zhang and colleagues explore the use of convolutional neural networks to enhance the resolution of Hi-C data in their paper: Enhancing Hi-C data resolution with deep convolutional neural network HiCPlus. In this paper, Zhang and colleagues were able to devise a CNN model (HiCPlus) that outperformed other currently used data enhancement methods including 2-D Gaussian smoothing. For our project, we intend to implement the HiCPlus model outlined in the paper and replicate the results demonstrated in the paper using a different dataset. We chose to implement this paper due to the intersection of its content with the interests of members in the group. In addition, the simplicity of the HiCPlus model architecture, which consists of only 3 convolution layers, seemed like a worthwhile and feasible deep learning architecture to  implement using the knowledge we have acquired in CS1470. This problem is a supervised learning regression problem, specifically because we are predicting hi-C contact values from noisy inputs.		
