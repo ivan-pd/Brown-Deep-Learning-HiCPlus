@@ -17,6 +17,8 @@ import sys
 import torch.nn as nn
 import argparse
 
+import tensorflow as tf
+
 use_gpu = 1
 
 conv2d1_filters_numbers = 8
@@ -74,21 +76,38 @@ def train(lowres,highres, outModel):
 
     print(low_resolution_samples.shape, Y.shape)
 
-    lowres_set = data.TensorDataset(torch.from_numpy(low_resolution_samples), torch.from_numpy(np.zeros(low_resolution_samples.shape[0])))
-    lowres_loader = torch.utils.data.DataLoader(lowres_set, batch_size=batch_size, shuffle=False)
+    # lowres_set = data.TensorDataset(torch.from_numpy(low_resolution_samples), torch.from_numpy(np.zeros(low_resolution_samples.shape[0])))
+    # lowres_loader = torch.utils.data.DataLoader(lowres_set, batch_size=batch_size, shuffle=False)
+    
+    inputs = tf.convert_to_tensor(low_resolution_samples)
+    targets = tf.convert_to_tensor(np.zeros(low_resolution_samples.shape[0]))
+    lowres_set = tf.data.DataSet.from_tensor_slices((inputs, targets))
+    lowres_loader = lowres_set.batch(batch_size)
+    lowres_loader = lowres_loader.make_one_shot_iterator()
 
-    hires_set = data.TensorDataset(torch.from_numpy(Y), torch.from_numpy(np.zeros(Y.shape[0])))
-    hires_loader = torch.utils.data.DataLoader(hires_set, batch_size=batch_size, shuffle=False)
 
+    # hires_set = data.TensorDataset(torch.from_numpy(Y), torch.from_numpy(np.zeros(Y.shape[0])))
+    # hires_loader = torch.utils.data.DataLoader(hires_set, batch_size=batch_size, shuffle=False)
+
+    hires_inputs = tf.convert_to_tensor(Y)
+    hires_targets = tf.convert_to_tensor(np.zeros(Y.shape[0]))
+    hires_set = tf.data.DataSet.from_tensor_slices((hires_inputs, hires_targets))
+    hires_loader = hires_set.batch(batch_size)
+    hires_loader = hires_loader.make_one_shot_iterator()
 
     Net = model.Net(40, 28)
 
     if use_gpu:
-        Net = Net.cuda()
+        Net = Net.cuda() #IPD: Not sure about the GPU stuff again
 
-    optimizer = optim.SGD(Net.parameters(), lr = 0.00001)
-    _loss = nn.MSELoss()
-    Net.train()
+    # optimizer = optim.SGD(Net.parameters(), lr = 0.00001)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001)
+
+    #     _loss = nn.MSELoss()
+    _loss = tf.keras.losses.MeanSquaredError()
+
+    # Net.train()
+    Net.call()
 
     running_loss = 0.0
     running_loss_validate = 0.0
@@ -103,20 +122,32 @@ def train(lowres,highres, outModel):
                 _lowRes, _ = v1
                 _highRes, _ = v2
                 
-                _lowRes = Variable(_lowRes)
-                _highRes = Variable(_highRes).unsqueeze(1)
+                # _lowRes = Variable(_lowRes)
+                # _highRes = Variable(_highRes).unsqueeze(1)
+                _lowRes = tf.Variable(_lowRes)
+                _highRes = tf.Variable(_highRes).expand_dims(1)
 
                 if use_gpu:
                     _lowRes = _lowRes.cuda()
                     _highRes = _highRes.cuda()
-                optimizer.zero_grad()
-                y_prediction = Net(_lowRes)
+
+                
+                # optimizer.zero_grad()
+                # y_prediction = Net(_lowRes)
 		
-                loss = _loss(y_prediction, _highRes)
-                loss.backward()
-                optimizer.step()
+                # loss = _loss(y_prediction, _highRes)
+                # loss.backward()
+                # optimizer.step()
 		
-                running_loss += loss.item()
+                # running_loss += loss.item()
+
+                with tf.GradientTape() as tape: 
+                    y_prediction = model.call(_lowRes)
+                    loss = model.loss(y_prediction, _highRes)
+                    running_loss += loss
+
+                gradients = tape.gradient(loss, model.trainable) 
+                optimizer.apply_gradients(zip(gradients, model.trainable))
         
         print('-------', i, epoch, running_loss/i, strftime("%Y-%m-%d %H:%M:%S", gmtime()))
 	
@@ -125,5 +156,6 @@ def train(lowres,highres, outModel):
         running_loss_validate = 0.0
 	# save the model every 100 epoches
         if (epoch % 100 == 0):
-            torch.save(Net.state_dict(), outModel + str(epoch) + str('.model'))
+            # torch.save(Net.state_dict(), outModel + str(epoch) + str('.model'))
+            model.save(outModel + str(epoch) + str('.model'))
         pass
